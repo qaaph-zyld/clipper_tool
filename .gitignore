@@ -1,0 +1,18 @@
+# Input/output folders
+input/
+output/
+
+# Temporary/log files
+run.log
+*.log
+
+# Environment
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Misc
+check_deps.py
