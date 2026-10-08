@@ -12,7 +12,8 @@ import logging
 import threading
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template_string, request, url_for
+from flask import Flask, jsonify, redirect, render_template_string, request, \
+    send_file, url_for
 
 from . import jobs
 from .types import Transcript
@@ -79,10 +80,12 @@ DETAIL = DETAIL_HEAD + """
 <form method=post action="/jobs/{{j.id}}/render" id=renderform>
 <button type=button onclick="doRender()">Render clips (with checked cuts)</button></form>
 <h3>Transcript</h3>
+<audio id=player controls preload=none src="/jobs/{{j.id}}/audio"
+ style="width:100%"></audio>
 {% for s in t.segments %}<div class=seg><time>[{{'%.1f'|format(s.start)}}]</time>
 {% for w in s.words %}<span class="w {% if w.flags %}flag{% endif %} {% if w.edited %}edited{% endif %}"
- onclick="edit({{s.id}},{{loop.index0}},this)"
- title="p={{w.prob}}{% if w.cyr %} | {{w.cyr}}{% endif %}{% if w.flags %} | {{w.flags|join(',')}}{% endif %}">{{w.w}}</span> {% endfor %}</div>{% endfor %}
+ onclick="seek({{w.start}})" ondblclick="edit({{s.id}},{{loop.index0}},this)"
+ title="p={{w.prob}}{% if w.cyr %} | {{w.cyr}}{% endif %}{% if w.flags %} | {{w.flags|join(',')}}{% endif %} — click=seek, dblclick=edit">{{w.w}}</span> {% endfor %}</div>{% endfor %}
 {% endif %}
 <script>
 async function edit(seg,idx,el){
@@ -112,6 +115,7 @@ async function delRange(){
 async function delOpCut(v){
  await fetch(`/jobs/{{j.id}}/delete_range`,{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify({remove:v})}); location.reload();}
+function seek(t){const p=document.getElementById('player');p.currentTime=t;p.play();}
 </script>"""
 
 
@@ -237,6 +241,14 @@ def delete_range(job_id):
     (d / "operator_cuts.json").write_text(
         json.dumps(sorted(cuts), ensure_ascii=False), encoding="utf-8")
     return jsonify(ok=True, cuts=cuts)
+
+
+@app.get("/jobs/<job_id>/audio")
+def audio(job_id):
+    wav = jobs.JOBS_DIR / job_id / "audio_16k.wav"
+    if not wav.exists():
+        return "no audio", 404
+    return send_file(wav, mimetype="audio/wav", conditional=True)
 
 
 @app.post("/jobs/<job_id>/render")
