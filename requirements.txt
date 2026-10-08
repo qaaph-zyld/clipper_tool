@@ -1,2 +1,5 @@
-openai
+whisperx@git+https://github.com/m-bain/whisperx.git
 python-dotenv
+opencv-python
+openai>=1.0.0
+numpy

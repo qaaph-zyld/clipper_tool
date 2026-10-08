@@ -1,0 +1,14 @@
+# Serbian hotword lists for faster-whisper transcription boosting.
+# Format: one section per topic, header line `[topic_name]`, followed by a
+# space-separated word list on the next line(s). Lines starting with `#` are
+# comments and are ignored by parsers. Multiple lines under a section are
+# concatenated together.
+
+[boxing]
+бокс Олимпијски Мемић Јован Николић Сара Ћирковић Душан Велетић Раско Симић медаља тешкаш таленти звезда звезде аматер професионалац
+
+[farming]
+фарма пољопривреда овце краве свиње радници радник газда газдујем извоз бизнис усеви жетва двориште животиње
+
+[general]
+Београд природа селу амбијент хаос мир мозак подкаст живот градови

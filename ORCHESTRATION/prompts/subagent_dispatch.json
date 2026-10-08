@@ -1,0 +1,58 @@
+{
+  "task": "Eliminate GPT-4o-mini Dependency for Serbian Transcription",
+  "project_root": "d:/Projects/Tools/clips-ai-tool",
+  "orchestration_dir": "ORCHESTRATION",
+  "orchestrator_model": "GLM-5.2 Max 1M",
+  "waves": [
+    {
+      "wave": 1,
+      "name": "Implementation",
+      "parallel": false,
+      "gate_after": true,
+      "agents": [
+        {
+          "agent_id": "A",
+          "role": "implementer",
+          "name": "Agent A: Code Changes (hotwords + fallback)",
+          "profile": "wave-implementer",
+          "model": "GLM-5.2 High",
+          "task": "MY TASK: Create hotwords_sr.txt, update transcribe_sr.py with hotwords/initial_prompt params, update correct_segments_with_gpt4o() with base_url + fallback chain, update .env with Groq/Gemini placeholders\n\nSCOPE: transcribe_sr.py, main.py, .env, hotwords_sr.txt\n\nOUTPUT: Write your handoff to: ORCHESTRATION/wave1/agent_a_handoff.md\n\nCONSTRAINTS:\n- Modify only the 3 specified files + create hotwords_sr.txt\n- Do NOT run transcription -- that is Wave 2\n- Preserve all existing functionality\n- Follow existing code conventions (logging, argparse, typing)\n\nCONTEXT BUDGET: 200k — stay within this window. Do not load raw file dumps;\nread summaries and targeted sections only.\n\nHANDOFF: When done, return the file path and a 1-2 sentence summary.",
+          "context_budget": "200k",
+          "output": "wave1/agent_a_handoff.md",
+          "background": false,
+          "constraints": [
+            "Modify only the 3 specified files + create hotwords_sr.txt",
+            "Do NOT run transcription -- that is Wave 2",
+            "Preserve all existing functionality",
+            "Follow existing code conventions (logging, argparse, typing)"
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "name": "Transcription + Verification",
+      "parallel": false,
+      "gate_after": false,
+      "agents": [
+        {
+          "agent_id": "B",
+          "role": "implementer",
+          "name": "Agent B: Re-transcribe and Compare",
+          "profile": "wave-implementer",
+          "model": "GLM-5.2 High",
+          "task": "MY TASK: Run transcribe_sr.py with hotwords on d:\\1H1A1087_audio.wav, save as v2, compare v1 vs v2, verify known errors fixed\n\nSCOPE: transcribe_sr.py, hotwords_sr.txt, d:\\1H1A1087_transcript.json\n\nOUTPUT: Write your handoff to: ORCHESTRATION/wave2/agent_b_handoff.md\n\nCONSTRAINTS:\n- Run transcription as a background command with polling (~20 min CPU)\n- Do NOT modify any source code -- only run and compare\n- Save v2 transcript to d:\\1H1A1087_transcript_v2.json\n- Report specific before/after for the 3 known errors\n\nCONTEXT BUDGET: 200k — stay within this window. Do not load raw file dumps;\nread summaries and targeted sections only.\n\nHANDOFF: When done, return the file path and a 1-2 sentence summary.",
+          "context_budget": "200k",
+          "output": "wave2/agent_b_handoff.md",
+          "background": false,
+          "constraints": [
+            "Run transcription as a background command with polling (~20 min CPU)",
+            "Do NOT modify any source code -- only run and compare",
+            "Save v2 transcript to d:\\1H1A1087_transcript_v2.json",
+            "Report specific before/after for the 3 known errors"
+          ]
+        }
+      ]
+    }
+  ]
+}

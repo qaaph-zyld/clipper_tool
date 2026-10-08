@@ -1,0 +1,53 @@
+{
+  "task": "Eliminate GPT-4o-mini Dependency for Serbian Transcription",
+  "project_root": "d:/Projects/Tools/clips-ai-tool",
+  "orchestration_dir": "ORCHESTRATION",
+  "waves": [
+    {
+      "wave": 1,
+      "name": "Implementation",
+      "parallel": false,
+      "gate_after": true,
+      "agents": [
+        {
+          "id": "A",
+          "role": "implementer",
+          "name": "Agent A: Code Changes (hotwords + fallback)",
+          "task": "Create hotwords_sr.txt, update transcribe_sr.py with hotwords/initial_prompt params, update correct_segments_with_gpt4o() with base_url + fallback chain, update .env with Groq/Gemini placeholders",
+          "scope": "transcribe_sr.py, main.py, .env, hotwords_sr.txt",
+          "output": "wave1/agent_a_handoff.md",
+          "constraints": [
+            "Modify only the 3 specified files + create hotwords_sr.txt",
+            "Do NOT run transcription -- that is Wave 2",
+            "Preserve all existing functionality",
+            "Follow existing code conventions (logging, argparse, typing)"
+          ],
+          "context_budget": "200k"
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "name": "Transcription + Verification",
+      "parallel": false,
+      "gate_after": false,
+      "agents": [
+        {
+          "id": "B",
+          "role": "implementer",
+          "name": "Agent B: Re-transcribe and Compare",
+          "task": "Run transcribe_sr.py with hotwords on d:\\1H1A1087_audio.wav, save as v2, compare v1 vs v2, verify known errors fixed",
+          "scope": "transcribe_sr.py, hotwords_sr.txt, d:\\1H1A1087_transcript.json",
+          "output": "wave2/agent_b_handoff.md",
+          "constraints": [
+            "Run transcription as a background command with polling (~20 min CPU)",
+            "Do NOT modify any source code -- only run and compare",
+            "Save v2 transcript to d:\\1H1A1087_transcript_v2.json",
+            "Report specific before/after for the 3 known errors"
+          ],
+          "context_budget": "200k"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "language": null,
+  "gpt_correct": false,
+  "gpt_model": "gpt-4o-mini",
+  "model": "medium",
+  "num_clips": 5,
+  "min_duration": 15.0,
+  "max_duration": 60.0,
+  "keyword_boost": []
+}
