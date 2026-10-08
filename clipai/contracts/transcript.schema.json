@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "transcript.schema.json",
+  "title": "Serbian Clip Studio transcript",
+  "type": "object",
+  "required": ["lang", "script", "segments", "meta"],
+  "properties": {
+    "lang": {"type": "string"},
+    "script": {"enum": ["latin", "cyrillic"]},
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "start", "end", "text"],
+        "properties": {
+          "id": {"type": "integer"},
+          "start": {"type": "number"},
+          "end": {"type": "number"},
+          "text": {"type": "string"},
+          "align_quality": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+          "words": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["w", "start", "end"],
+              "properties": {
+                "w": {"type": "string"},
+                "start": {"type": "number"},
+                "end": {"type": "number"},
+                "prob": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+                "edited": {"type": "boolean"},
+                "cyr": {"type": ["string", "null"]},
+                "flags": {"type": "array", "items": {"type": "string"}},
+                "sugg": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["text", "source"],
+                    "properties": {
+                      "text": {"type": "string"},
+                      "source": {"enum": ["dict", "fuzzy", "phonetic", "bertic", "srberta", "llm", "user"]},
+                      "score": {"type": ["number", "null"]}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": ["model"],
+      "properties": {
+        "model": {"type": "string"},
+        "hotwords_topic": {"type": ["string", "null"]},
+        "align_method": {"enum": ["wav2vec2-sr", "stable-ts", "fw-word-ts", "segment", null]},
+        "source_video": {"type": ["string", "null"]},
+        "created": {"type": ["string", "null"]},
+        "schema_version": {"type": "string"}
+      }
+    }
+  }
+}

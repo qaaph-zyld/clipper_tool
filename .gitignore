@@ -17,6 +17,11 @@ __pycache__/
 # Model weights (1.5+ GB, downloaded/converted locally)
 models/
 
+# Eval artifacts — regenerable/downloadable, kept out of git
+eval/excerpts/
+eval/hunspell/*.dic
+eval/hunspell/*.aff
+
 # Misc
 check_deps.py
 test-output.txt

@@ -1,0 +1,16 @@
+# Serbian viral hook words/phrases — Latin script, lower-case, space-separated.
+# Curiosity gaps
+šta ako tajna niko nikad nećeš verovati skriveno otkriveno istina o
+pravi razlog niko ti ne govori niko ne zna zamisli pazi sad slušaj
+# Emotion
+šokantno neverovatno neverovatna neviđeno ludo ludilo srceparajuće
+inspirativno moćno jak jaka emotivno brutalno epski
+# Urgency / CTA
+čekaj gledaj do kraja ostani komentariši podeli lajkuj zaprati
+ne preskači poslednja šansa pre nego što bude kasno odmah sada
+# Contrast / surprise
+ali onda iznenada plot twist neočekivano ispostavilo se ispostavilo
+sukob svađa drama skandal žestoko
+# Podcast-native hooks
+priča istinita priča prava priča nisam znao nismo znali
+mislim da vam niko nije rekao hoću da ti kažem slušaj me

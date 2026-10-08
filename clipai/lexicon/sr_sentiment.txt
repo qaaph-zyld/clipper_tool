@@ -1,0 +1,13 @@
+# Serbian sentiment lexicon — [positive] / [negative] sections, Latin.
+[positive]
+dobar odličan sjajan super najbolji lep lepa lepo srećan srećna
+savršen neverovatan fantastičan divan briljantan pobeda uspeh
+ponos uzbuđen radost nada volim voljen zahvalan hrabro junački
+šampion zlatna medalja pobedio pobeda trijumf talenat genijalan
+moćan snažan brz precizan legendaran
+
+[negative]
+loš strašan najgori mrzim užasan tužan jadan strašno propao
+neuspeh greška pokvaren ljut strah bol gubitak mrtav ubijen
+borba opasnost kriza problem poraz težak teška tragedija
+nesreća bolno razočaran razočaranje propast krah blam

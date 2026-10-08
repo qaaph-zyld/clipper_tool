@@ -1,6 +1,29 @@
-# clips-ai-tool
+# clips-ai-tool — Serbian Clip Studio
 
 Extract viral short clips from long videos with AI-powered transcription, caption burning, and smart clip scoring.
+
+> **New (branch `sr-clip-studio`):** the `clipai/` package is a Serbian-first
+> rebuild — dedicated `sr-v3-ct2` ASR, Cyrillic→Latin normalization,
+> `wav2vec2-juznevesti-sr` word alignment with fallback chain, Serbian
+> lexicon scoring, karaoke captions, YuNet 9:16 reframing, tiered local
+> correction (tier-0 dictionary/phonetic → tier-1 SRBerta), and a light
+> Flask UI with a fix-queue for flagged words. See `clipai/contracts/`.
+
+## Serbian pipeline quickstart
+
+```bash
+# CLI — transcribe one video to output/<stem>/transcript.json (checkpointed)
+python -X utf8 -m clipai "input/main_20260607150158_1.ts" --lang sr
+
+# UI — job queue, transcript editor, fix-queue, render trigger
+run_ui.bat    # http://127.0.0.1:7860
+```
+
+CPU-only reality check: ASR runs ~3–9× realtime on this box (i7-4770). A
+50-min podcast ≈ 2.5–7 h — queue it and come back; checkpoints survive
+interruption (`output/jobs/<id>/checkpoint.json`).
+
+## Original features
 
 ## Features
 

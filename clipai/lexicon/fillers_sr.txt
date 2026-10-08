@@ -1,0 +1,12 @@
+# Serbian fillers / discourse crutches — candidates for smart-cut.
+# Latin; one per line. `safe` = nearly always removable; `context` = only when
+# isolated by silence (they carry meaning inside a clause).
+[safe]
+eee ehm hm mm aaa uhh
+znaš znaš li 'jate znači bukvalno bukvalno zapravo
+kao kao što kažem kažem ti ono ovaj onaj
+u suštini generalno u principu apsolutno
+razumeš razumete kapiraš kontaš vidiš vidiš li
+
+[context]
+dakle pa znači eto ovako tako

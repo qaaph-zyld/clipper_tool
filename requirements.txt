@@ -3,3 +3,16 @@ python-dotenv
 opencv-python
 openai>=1.0.0
 numpy
+# --- Serbian Clip Studio (clipai) ---
+faster-whisper>=1.2
+cyrtranslit>=1.2
+pydantic<2
+jsonschema
+flask
+spylls            # hunspell reader (optional: tier-0 dict flagging)
+rapidfuzz         # fuzzy suggestions
+abydos            # phonetic matching (optional)
+jiwer             # eval only
+transformers      # tier-1 SRBerta suggestions (optional)
+torch             # tier-1 + wav2vec2 aligner
+# stable-ts       # optional align fallback
