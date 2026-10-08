@@ -69,6 +69,9 @@ def run_engine(cfg):
 
     per_file = {}
     for wav in EXCERPTS:
+        if (out_dir / (wav.stem + ".json")).exists():
+            lg(f"{wav.stem}: SKIP (already done)")
+            continue
         try:
             t1 = time.time()
             segments, info = model.transcribe(

@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Tuple
 
-from .normalize import align_token
 from .types import Segment, Transcript
 
 logger = logging.getLogger("clipai.align")
@@ -42,7 +41,6 @@ def align_whisperx(t: Transcript, audio_path: str, device: str = "cpu") -> Trans
     audio = whisperx.load_audio(audio_path)
 
     for seg in t.segments:
-        tokens = [align_token(w.w) for w in seg.words]
         orig = [(w.start, w.end) for w in seg.words]
         try:
             out = whisperx.align(
@@ -55,6 +53,13 @@ def align_whisperx(t: Transcript, audio_path: str, device: str = "cpu") -> Trans
                 for w, a in zip(seg.words, aw):
                     if a.get("start") is not None and a.get("end") is not None:
                         w.start, w.end = round(a["start"], 3), round(a["end"], 3)
+            else:
+                # aligner re-split text differently -> index map invalid;
+                # mark weak so the fallback chain handles this segment.
+                logger.info("seg %d align word mismatch (%d vs %d) -> fallback",
+                            seg.id, len(aw), len(seg.words))
+                seg.align_quality = 0.0
+                continue
             q = _align_quality(seg)
             seg.align_quality = round(q, 3)
             if q < 1 - UNALIGNED_RATIO_ABORT:

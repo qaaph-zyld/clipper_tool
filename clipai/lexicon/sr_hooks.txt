@@ -1,16 +1,19 @@
-# Serbian viral hook words/phrases — Latin script, lower-case, space-separated.
+# Serbian viral hook words/phrases — Latin, comma-separated entries.
+# Multi-word entries match as substring phrases (loaded via _load_phrases).
 # Curiosity gaps
-šta ako tajna niko nikad nećeš verovati skriveno otkriveno istina o
-pravi razlog niko ti ne govori niko ne zna zamisli pazi sad slušaj
+šta ako, tajna, niko nikad, nećeš verovati, neces verovati, skriveno,
+otkriveno, istina o, pravi razlog, niko ti ne govori, niko ne zna,
+zamisli, pazi sad, slušaj ovo, slusaj ovo
 # Emotion
-šokantno neverovatno neverovatna neviđeno ludo ludilo srceparajuće
-inspirativno moćno jak jaka emotivno brutalno epski
+šokantno, sokantno, neverovatno, neverovatna, neviđeno, ludo, ludilo,
+srceparajuće, inspirativno, moćno, emotivno, brutalno, epski
 # Urgency / CTA
-čekaj gledaj do kraja ostani komentariši podeli lajkuj zaprati
-ne preskači poslednja šansa pre nego što bude kasno odmah sada
+čekaj, cekaj, gledaj, do kraja, ostani, komentariši, komentarisi, podeli,
+lajkuj, zaprati, ne preskači, poslednja šansa, odmah, sada
 # Contrast / surprise
-ali onda iznenada plot twist neočekivano ispostavilo se ispostavilo
-sukob svađa drama skandal žestoko
+ali onda, iznenada, plot twist, neočekivano, neocenjeno, ispostavilo se,
+sukob, svađa, svadja, drama, skandal, žestoko, zestoko
 # Podcast-native hooks
-priča istinita priča prava priča nisam znao nismo znali
-mislim da vam niko nije rekao hoću da ti kažem slušaj me
+istinita priča, prava priča, nisam znao, nismo znali,
+niko nije rekao, niko vam nije rekao, hoću da ti kažem, hocu da ti kazem,
+slušaj me, slusaj me

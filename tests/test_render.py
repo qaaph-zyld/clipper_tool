@@ -1,6 +1,6 @@
 """Caption + render math tests — no ffmpeg/video needed."""
 from clipai.captions import build_ass, build_srt, build_vtt, _group_lines
-from clipai.render import remap_time, _shifted_transcript
+from clipai.render import remap_time, _shifted_transcript, clip_x_expression
 from clipai.reframe import crop_geometry, smooth, x_expression
 from clipai.types import Segment, Transcript, TranscriptMeta, Word
 
@@ -82,6 +82,16 @@ def test_x_expression_static_and_track():
     expr = x_expression({"mode": "track", "steps": [
         {"t": 0, "x": 50}, {"t": 1, "x": 80}]}, 0)
     assert "if(lt(t" in expr and "80" in expr
+
+
+def test_clip_x_expression_hard_reset():
+    # two keep segments separated by a cut: x must JUMP, not interpolate
+    plans = [{"start": 0, "end": 5, "mode": "static", "x": 100},
+             {"start": 7, "end": 12, "mode": "static", "x": 300}]
+    cuts = [(5.0, 7.0)]
+    expr = clip_x_expression(plans, cuts, clip_start=0)
+    # output boundary = 5.0 (cut (5,7) removes 2s; seg2 starts at out t=5)
+    assert expr == "if(lt(t\\,5.000)\\,100\\,300)"
 
 
 def test_no_cyrillic_in_caption_output():

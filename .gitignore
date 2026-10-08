@@ -15,7 +15,9 @@ __pycache__/
 *.pyo
 
 # Model weights (1.5+ GB, downloaded/converted locally)
-models/
+/models/
+# but NOT the small bundled runtime models (YuNet ~230KB)
+!clipai/assets/models/
 
 # Eval artifacts — regenerable/downloadable, kept out of git
 eval/excerpts/

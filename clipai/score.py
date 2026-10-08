@@ -47,7 +47,24 @@ def _load_sections(name: str) -> Dict[str, Set[str]]:
     return sections
 
 
-HOOKS = _load_wordlist("sr_hooks.txt")
+def _load_phrases(name: str) -> Set[str]:
+    """Comma-separated phrases — kept whole (substring matching), NOT split
+    into words (that would explode 'pre nego' into stopwords)."""
+    p = LEXICON / name
+    if not p.exists():
+        logger.warning("lexicon missing: %s", name)
+        return set()
+    out = set()
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0] if not raw.lstrip().startswith("#") else ""
+        for phrase in line.split(","):
+            phrase = phrase.strip().lower()
+            if phrase:
+                out.add(phrase)
+    return out
+
+
+HOOKS = _load_phrases("sr_hooks.txt")
 _SENT = _load_sections("sr_sentiment.txt")
 POSITIVE = _SENT.get("positive", set())
 NEGATIVE = _SENT.get("negative", set())

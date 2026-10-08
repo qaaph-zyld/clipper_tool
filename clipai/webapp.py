@@ -40,7 +40,10 @@ Clips: <input name=num_clips value=5 size=3>
 {% for j in jobs %}
 <div class=job><a href=/jobs/{{j.id}}><code>{{j.id}}</code></a>
 <b class={{j.state}}>{{j.state}}</b> {{j.video.split('\\\\')[-1].split('/')[-1]}}
-— stage: {{j.stage or '—'}}{% if j.eta_s %}, ETA ~{{(j.eta_s/60)|round}} min{% endif %}
+— stage: {{j.stage or '—'}}
+{% if j.progress is not none and j.state == 'running' %}
+ — {{(j.progress*100)|round}}%{% if j.asr_frac %} of audio{% endif %}{% endif %}
+{% if j.eta_s %}, ETA ~{{(j.eta_s/60)|round}} min{% endif %}
 {% if j.n_flagged is not none %}— {{j.n_flagged}} flagged, {{j.n_clips}} clips{% endif %}
 {% if j.error %}<br><span class=failed>{{j.error}}</span>{% endif %}</div>
 {% endfor %}
@@ -57,11 +60,24 @@ time{color:#888;font-size:12px}button{font-size:12px}</style>
 
 DETAIL = DETAIL_HEAD + """
 {% if t %}
+{% if proposed_cuts %}
+<h3>Smart-cut proposals ({{proposed_cuts|length}})</h3>
+<form id=cutsform>{% for c in proposed_cuts %}
+<label><input type=checkbox name=cut value="{{c.start}}-{{c.end}}">
+ cut {{c.words|join(' ')}} @ {{'%.1f'|format(c.start)}}s ({{c.quality}})</label><br>{% endfor %}</form>
+{% endif %}
+<h3>Delete range (recut)</h3>
+<div>start <input id=del_start size=6> s — end <input id=del_end size=6> s
+<button onclick="delRange()">add cut</button></div>
+<div id=op_cuts>{% for c in operator_cuts %}<div>✂ {{c[0]}}–{{c[1]}}s
+ <button onclick="delOpCut('{{c[0]}}-{{c[1]}}')">undo</button></div>{% endfor %}</div>
 <h3>Fix queue ({{flagged|length}} flagged)</h3>
 {% for f in flagged %}
 <div><b>{{f.word}}</b> @ {{f.t}}s — {{f.reasons|join(', ')}}
 <button onclick="suggest({{f.seg}},{{f.idx}},this)">suggest</button><span class=sugg></span></div>
 {% endfor %}
+<form method=post action="/jobs/{{j.id}}/render" id=renderform>
+<button type=button onclick="doRender()">Render clips (with checked cuts)</button></form>
 <h3>Transcript</h3>
 {% for s in t.segments %}<div class=seg><time>[{{'%.1f'|format(s.start)}}]</time>
 {% for w in s.words %}<span class="w {% if w.flags %}flag{% endif %} {% if w.edited %}edited{% endif %}"
@@ -83,6 +99,19 @@ async function suggest(seg,idx,el){
 async function accept(seg,idx,text,sp){
  const r=await fetch(`/jobs/{{j.id}}/edit`,{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify({seg,idx,word:text})}); if(r.ok)location.reload();}
+async function doRender(){
+ const cuts=[...document.querySelectorAll('#cutsform input:checked')].map(c=>c.value);
+ const r=await fetch(`/jobs/{{j.id}}/render`,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({cuts})}); const d=await r.json();
+ alert(d.ok?'render queued':'error: '+(d.error||'')); if(d.ok)location.reload();}
+async function delRange(){
+ const s=parseFloat(del_start.value), e=parseFloat(del_end.value);
+ if(isNaN(s)||isNaN(e)||e<=s){alert('bad range');return;}
+ await fetch(`/jobs/{{j.id}}/delete_range`,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({start:s,end:e})}); location.reload();}
+async function delOpCut(v){
+ await fetch(`/jobs/{{j.id}}/delete_range`,{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({remove:v})}); location.reload();}
 </script>"""
 
 
@@ -122,7 +151,15 @@ def detail(job_id):
                 idx = seg.words.index(w)
                 flagged.append({"seg": seg.id, "idx": idx, "word": w.w,
                                 "t": round(w.start, 1), "reasons": w.flags})
-    return render_template_string(DETAIL, j=st, t=t, flagged=flagged)
+    proposed_cuts = []
+    cj = d / "clips.json"
+    if cj.exists():
+        proposed_cuts = json.loads(cj.read_text(encoding="utf-8")) \
+            .get("proposed_cuts", [])
+    operator_cuts = _op_cuts(d)
+    return render_template_string(DETAIL, j=st, t=t, flagged=flagged,
+                                  proposed_cuts=proposed_cuts,
+                                  operator_cuts=operator_cuts)
 
 
 @app.get("/jobs/<job_id>/transcript.json")
@@ -138,7 +175,9 @@ def edit(job_id):
         d, t = _load(job_id)
         if t is None:
             return "no transcript", 404
-        seg = next(s for s in t.segments if s.id == body["seg"])
+        seg = next((s for s in t.segments if s.id == body["seg"]), None)
+        if seg is None or not (0 <= int(body["idx"]) < len(seg.words)):
+            return "bad seg/idx", 404
         w = seg.words[int(body["idx"])]
         w.w = body["word"].strip()
         w.edited = True              # contract: edits never touch w.cyr
@@ -153,7 +192,9 @@ def suggest(job_id):
     d, t = _load(job_id)
     if t is None:
         return "no transcript", 404
-    seg = next(s for s in t.segments if s.id == body["seg"])
+    seg = next((s for s in t.segments if s.id == body["seg"]), None)
+    if seg is None or not (0 <= int(body["idx"]) < len(seg.words)):
+        return "bad seg/idx", 404
     w = seg.words[int(body["idx"])]
     if not w.sugg:
         from .correct.tier0 import suggest as t0
@@ -167,12 +208,54 @@ def suggest(job_id):
     return jsonify(suggestions=[s.dict() for s in w.sugg])
 
 
+def _op_cuts(d: Path) -> list:
+    p = d / "operator_cuts.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+    return []
+
+
+@app.post("/jobs/<job_id>/delete_range")
+def delete_range(job_id):
+    """Operator-controlled deletion — explicit [start,end] source ranges.
+    Stored alongside smart-cut proposals; render consumes the union."""
+    body = request.get_json(force=True)
+    d = jobs.JOBS_DIR / job_id
+    cuts = _op_cuts(d)
+    if "remove" in body:
+        s, e = body["remove"].split("-")
+        cuts = [c for c in cuts if not (abs(c[0] - float(s)) < 1e-3
+                                        and abs(c[1] - float(e)) < 1e-3)]
+    else:
+        s, e = float(body["start"]), float(body["end"])
+        if e <= s:
+            return jsonify(error="end <= start"), 400
+        cuts.append([s, e])
+    (d / "operator_cuts.json").write_text(
+        json.dumps(sorted(cuts), ensure_ascii=False), encoding="utf-8")
+    return jsonify(ok=True, cuts=cuts)
+
+
 @app.post("/jobs/<job_id>/render")
 def render(job_id):
     st = jobs.read_status(job_id) or {}
-    if st.get("state") != "transcribed":
+    if st.get("state") not in ("transcribed", "done"):
         return jsonify(error="job not transcribed yet"), 409
-    _write = jobs._write_status(job_id, render_queued=True)
+    body = request.get_json(force=True, silent=True) or {}
+    # union: operator-accepted proposals + operator delete-ranges
+    accepted = []
+    for item in body.get("cuts", []):
+        try:
+            s, e = item.split("-")
+            accepted.append((float(s), float(e)))
+        except Exception:
+            continue
+    d0 = jobs.JOBS_DIR / job_id
+    accepted += [tuple(c) for c in _op_cuts(d0)]
+
     def _bg():
         try:
             from .render import render_clip
@@ -180,12 +263,9 @@ def render(job_id):
             d = jobs.JOBS_DIR / job_id
             t = Transcript.load(d / "transcript.json")
             clips = json.loads((d / "clips.json").read_text(encoding="utf-8"))["clips"]
-            cuts = [(c["start"], c["end"]) for c in
-                    json.loads((d / "clips.json").read_text(encoding="utf-8"))
-                    .get("proposed_cuts", [])]
             jobs._write_status(job_id, state="rendering", stage="render")
             metas = [render_clip(Path(st["video"]), t, c, d, i + 1,
-                                 cuts=[x for x in cuts if c["start"] <= x[0] < c["end"]])
+                                 cuts=[x for x in accepted if c["start"] <= x[0] < c["end"]])
                      for i, c in enumerate(clips)]
             jobs._write_status(job_id, state="done", rendered=len(metas))
         except Exception as e:

@@ -39,7 +39,7 @@ def _dict_and_stems(dic_dir: Optional[Path] = None):
         try:
             lines = dic_path.read_text(encoding="utf-8").splitlines()
             _stems = [ln.split("/")[0].strip() for ln in lines[1:]
-                      if ln.strip() and "/" in ln or ln.strip()]
+                      if ln.strip()]
             _stems = [s for s in _stems if s]
         except Exception as e:
             logger.warning("stem list unavailable: %s", e)

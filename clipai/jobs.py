@@ -125,7 +125,7 @@ def _worker() -> None:
 
 
 def _run_job(job_id: str) -> None:
-    from .transcribe import run as transcribe_run, extract_audio, STAGES as T_STAGES
+    from .transcribe import run as transcribe_run, extract_audio
     from .types import Transcript
     from .score import find_clips
     from .smartcut import propose_cuts, Strength
@@ -145,9 +145,22 @@ def _run_job(job_id: str) -> None:
                            f"{dur/60:.0f} min audio ≈ {eta_asr/60:.0f} min")
 
     t0 = time.time()
+
+    def _progress(seg_end: float, total: float) -> None:
+        if not total:
+            return
+        frac = min(seg_end / total, 1.0)
+        elapsed = time.time() - t0
+        remain = elapsed / max(frac, 1e-3) - elapsed if frac > 0.01 else None
+        _write_status(job_id, stage="asr",
+                      progress=round(0.05 + frac * 0.75, 3),
+                      asr_frac=round(frac, 3),
+                      eta_s=round(remain) if remain else round(eta_asr))
+
     t = transcribe_run(video, out, engine=st.get("engine"),
                        language=st.get("language", "sr"),
-                       hotwords_topic=st.get("hotwords_topic"))
+                       hotwords_topic=st.get("hotwords_topic"),
+                       on_progress=_progress)
     asr_wall = time.time() - t0
     _write_status(job_id, stage="scoring", progress=0.85,
                   measured_rtf=round(asr_wall / max(dur, 1), 2))

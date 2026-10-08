@@ -57,8 +57,11 @@ def parse_hotwords_file(path: Path, topic: Optional[str] = None) -> str:
 
 def transcribe(audio_path: str, engine: str, language: str = "sr",
                beam_size: int = 5, hotwords_topic: Optional[str] = None,
-               initial_prompt: Optional[str] = None) -> dict:
-    """Run a faster-whisper engine; returns whisper-style dict with word ts."""
+               initial_prompt: Optional[str] = None,
+               on_segment=None) -> dict:
+    """Run a faster-whisper engine; returns whisper-style dict with word ts.
+    on_segment(seg_end_s, total_duration_s) fires per decoded segment —
+    drives live job progress + rolling ETA."""
     from faster_whisper import WhisperModel
 
     spec = ENGINES[engine]
@@ -78,6 +81,11 @@ def transcribe(audio_path: str, engine: str, language: str = "sr",
     )
     segs = []
     for seg in segments:
+        if on_segment:
+            try:
+                on_segment(seg.end, info.duration or 0)
+            except Exception:
+                pass
         segs.append({
             "id": seg.id, "start": round(seg.start, 3), "end": round(seg.end, 3),
             "text": seg.text.strip(),

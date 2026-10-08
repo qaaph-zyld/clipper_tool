@@ -83,7 +83,7 @@ def _normalize(t: Transcript) -> Transcript:
 
 def run(video_path: Path, out_dir: Path, engine: Optional[str] = None,
         language: str = "sr", hotwords_topic: Optional[str] = None,
-        do_align: bool = True) -> Transcript:
+        do_align: bool = True, on_progress=None) -> Transcript:
     from . import asr as asr_mod
 
     out_dir = Path(out_dir)
@@ -97,27 +97,30 @@ def run(video_path: Path, out_dir: Path, engine: Optional[str] = None,
         logger.info("resume: asr loaded from checkpoint")
     else:
         raw = asr_mod.transcribe(str(audio), engine=engine, language=language,
-                                 hotwords_topic=hotwords_topic)
+                                 hotwords_topic=hotwords_topic,
+                                 on_segment=on_progress)
         raw_path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
         ck.mark("asr")
 
-    t = _to_transcript(raw, engine, hotwords_topic, str(video_path))
-
-    if not ck.done("normalize"):
-        t = _normalize(t)
+    # resume fast-path: align already checkpointed -> transcript.json holds
+    # aligned timings; rebuilding from raw would silently lose them.
+    t_path = out_dir / "transcript.json"
+    if ck.done("align") and t_path.exists():
+        t = Transcript.load(t_path)
+        logger.info("resume: aligned transcript loaded from checkpoint")
+    else:
+        t = _to_transcript(raw, engine, hotwords_topic, str(video_path))
+        t = _normalize(t)            # deterministic; idempotent
         ck.mark("normalize")
-    else:
-        t = _normalize(t)  # deterministic; always reapply (cheap)
 
-    if do_align and not ck.done("align"):
-        from .align import align
-        try:
-            align(t, str(audio))
-        except Exception as e:
-            logger.warning("align stage failed: %s", e)
-        ck.mark("align")
-    else:
-        logger.info("resume: align skipped (done or disabled)")
+        if do_align:
+            from .align import align
+            try:
+                align(t, str(audio))
+            except Exception as e:
+                logger.warning("align stage failed: %s", e)
+            ck.mark("align")
+            t.save(t_path)           # persist aligned timings immediately
 
     if not ck.done("flags"):
         apply_flags(t)

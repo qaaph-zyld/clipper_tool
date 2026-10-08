@@ -63,13 +63,44 @@ def _shifted_transcript(t: Transcript, cuts: List[Tuple[float, float]],
     return tc
 
 
+def _remap_steps(plan: dict, cuts: List[Tuple[float, float]],
+                 clip_start: float) -> dict:
+    """x_expression steps are source-time; crop's t is output-time -> remap."""
+    if plan.get("mode") != "track":
+        return plan
+    base = remap_time(clip_start, cuts)
+    p = dict(plan)
+    p["steps"] = [{"t": remap_time(st["t"], cuts) - base, "x": st["x"]}
+                  for st in plan["steps"]]
+    return p
+
+
+def clip_x_expression(seg_plans: List[dict], cuts: List[Tuple[float, float]],
+                      clip_start: float) -> str:
+    """Whole-clip ffmpeg x= expression: each keep-segment contributes its own
+    static/stepwise plan; expression jumps at cut boundaries — CONTRACTS #13
+    (never interpolate across a cut)."""
+    if len(seg_plans) <= 1:
+        p = seg_plans[0] if seg_plans else {"mode": "static", "x": 0}
+        return reframe.x_expression(_remap_steps(p, cuts, clip_start), 0)
+    # nested if() keyed on OUTPUT-time segment boundaries
+    base = remap_time(clip_start, cuts)  # cuts before clip start shift output
+    expr = reframe.x_expression(_remap_steps(seg_plans[-1], cuts, clip_start), 0)
+    for p in reversed(seg_plans[:-1]):
+        boundary_out = remap_time(p["end"], cuts) - base
+        inner = reframe.x_expression(_remap_steps(p, cuts, clip_start), 0)
+        expr = f"if(lt(t\\,{boundary_out:.3f})\\,{inner}\\,{expr})"
+    return expr
+
+
 def render_clip(video_path: Path, t: Transcript, clip: dict,
                 out_dir: Path, index: int,
                 cuts: Optional[List[Tuple[float, float]]] = None,
                 karaoke: bool = True) -> dict:
     """Render one scored clip. `cuts` = smart-cut deletions inside the clip."""
-    out_dir = Path(out_dir)
+    out_dir = Path(out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
+    video_path = Path(video_path).resolve()
     start, end = clip["start"], clip["end"]
     cuts = sorted(cuts or [])
     keep = [(max(s, start), min(e, end))
@@ -88,15 +119,16 @@ def render_clip(video_path: Path, t: Transcript, clip: dict,
     vtt_path.write_text(cap_mod.build_vtt(t_out, 0, end - start), encoding="utf-8")
 
     plan = reframe.crop_plan(video_path, start, end, keep_segments=keep)
-    seg_plan = plan["segments"][0]
-    x_expr = reframe.x_expression(seg_plan, start)
+    x_expr = clip_x_expression(plan["segments"], cuts, start)
     vf = (f"crop={plan['crop_w']}:{plan['crop_h']}:{x_expr}:{plan['crop_y']},"
           f"scale=1080:1920")
 
     tmp = out_dir / f"short_{index:02d}_tmp.mp4"
     out = out_dir / f"short_{index:02d}.mp4"
 
-    af = audio_filtergraph(keep) if len(keep) > 1 else None
+    # -ss/-to already clipped the input: atrim needs clip-relative times
+    keep_rel = [(s - start, e - start) for s, e in keep]
+    af = audio_filtergraph(keep_rel) if len(keep_rel) > 1 else None
     cmd1 = ["ffmpeg", "-y", "-ss", str(start), "-to", str(end),
             "-i", str(video_path)]
     if af:
@@ -104,10 +136,11 @@ def render_clip(video_path: Path, t: Transcript, clip: dict,
     cmd1 += ["-vf", vf] + VIDEO_PRESET + AUDIO_CODEC + [str(tmp)]
     subprocess.run(cmd1, check=True, capture_output=True)
 
-    cmd2 = ["ffmpeg", "-y", "-i", str(tmp),
-            "-vf", f"ass='{ass_path.name}'",
+    # cwd=out_dir so `ass=name` resolves — io paths must be ABSOLUTE then
+    cmd2 = ["ffmpeg", "-y", "-i", str(tmp.resolve()),
+            "-vf", f"ass={ass_path.name}",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy", str(out)]
+            "-c:a", "copy", str(out.resolve())]
     subprocess.run(cmd2, check=True, capture_output=True, cwd=str(out_dir))
     tmp.unlink(missing_ok=True)
 
@@ -116,7 +149,7 @@ def render_clip(video_path: Path, t: Transcript, clip: dict,
             "score": clip.get("score"), "word_count": clip.get("word_count"),
             "cuts_removed": len(cuts),
             "crop": {"w": plan["crop_w"], "h": plan["crop_h"],
-                     "mode": seg_plan["mode"]}}
+                     "modes": [p["mode"] for p in plan["segments"]]}}
     (out_dir / f"short_{index:02d}.json").write_text(
         __import__("json").dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
     logger.info("rendered %s", out.name)
