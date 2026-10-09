@@ -79,6 +79,7 @@ DETAIL = DETAIL_HEAD + """
 {% endfor %}
 <form method=post action="/jobs/{{j.id}}/render" id=renderform>
 <button type=button onclick="doRender()">Render clips (with checked cuts)</button></form>
+{% if n_rendered %}<p><a href="/jobs/{{j.id}}/review"><b>&rarr; Review {{n_rendered}} rendered clip(s)</b></a></p>{% endif %}
 <h3>Transcript</h3>
 <audio id=player controls preload=none src="/jobs/{{j.id}}/audio"
  style="width:100%"></audio>
@@ -161,9 +162,11 @@ def detail(job_id):
         proposed_cuts = json.loads(cj.read_text(encoding="utf-8")) \
             .get("proposed_cuts", [])
     operator_cuts = _op_cuts(d)
+    n_rendered = len(list(d.glob("short_*.mp4"))) if d.exists() else 0
     return render_template_string(DETAIL, j=st, t=t, flagged=flagged,
                                   proposed_cuts=proposed_cuts,
-                                  operator_cuts=operator_cuts)
+                                  operator_cuts=operator_cuts,
+                                  n_rendered=n_rendered)
 
 
 @app.get("/jobs/<job_id>/transcript.json")
@@ -249,6 +252,125 @@ def audio(job_id):
     if not wav.exists():
         return "no audio", 404
     return send_file(wav, mimetype="audio/wav", conditional=True)
+
+
+REVIEW = """<!doctype html><meta charset=utf-8><title>review {{j.id}}</title>
+<style>body{font:15px/1.5 system-ui;max-width:860px;margin:1.5em auto;padding:0 1em}
+.row{border-radius:8px;padding:12px;margin:10px 0;border:1px solid #ccc}
+.review{background:#e8f8ea;border-color:#3ccf5a}
+.keep{background:#fbf6dc;border-color:#e6c229}
+.reject{background:#fbe4e4;border-color:#e04848;opacity:.75}
+.ref{background:#eee;border-color:#999}
+video{width:340px;background:#000;border-radius:4px}
+textarea{width:280px;font:13px system-ui}select{font-size:14px}
+.meta{font-size:12px;color:#666}</style>
+<p><a href=/>&larr; jobs</a> — review job <code>{{j.id}}</code> —
+{{rows|length}} clips. Pick ONE per row; verdict + comment autosave.</p>
+{% if j.todo %}<div class=ref row><b>Listen for:</b> {{j.todo}}</div>{% endif %}
+{% for r in rows %}
+<div class="row {{r.cls}}"><b>{{r.name}}</b> <span class=meta>{{r.meta}}</span><br>
+<video controls preload=none src="/jobs/{{j.id}}/clip/{{r.file}}"></video><br>
+<select onchange="save(this,'{{r.file}}')">
+ <option value="">— verdict —</option>
+ <option value=keep {% if r.verdict=='keep' %}selected{% endif %}>keep</option>
+ <option value=reject {% if r.verdict=='reject' %}selected{% endif %}>reject</option>
+</select>
+<textarea placeholder="comment…" onchange="note(this,'{{r.file}}')">{{r.comment or ''}}</textarea>
+<span class=meta id=saved_{{r.file}}>{{r.saved or ''}}</span></div>
+{% endfor %}
+<script>
+async function post(url,b){const r=await fetch(url,{method:'POST',
+ headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+ return r.ok;}
+async function save(el,f){await post(`/jobs/{{j.id}}/verdict`,{clip:f,verdict:el.value});
+ document.getElementById('saved_'+f).textContent='saved '+new Date().toLocaleTimeString();
+ el.closest('.row').className='row '+(el.value||'review');}
+async function note(el,f){await post(`/jobs/{{j.id}}/verdict`,{clip:f,comment:el.value});
+ document.getElementById('saved_'+f).textContent='note saved';}
+</script>"""
+
+
+def _review_log(d: Path) -> Path:
+    return d / "review.jsonl"
+
+
+def _read_verdicts(d: Path) -> dict:
+    """Latest verdict+comment per clip file."""
+    out = {}
+    p = _review_log(d)
+    if not p.exists():
+        return out
+    for line in p.read_text(encoding="utf-8").splitlines():
+        try:
+            r = json.loads(line)
+            cur = out.get(r["clip"], {})
+            cur.update({k: v for k, v in r.items() if v not in (None, "")})
+            out[r["clip"]] = cur
+        except Exception:
+            continue
+    return out
+
+
+@app.get("/jobs/<job_id>/clip/<name>")
+def clip_file(job_id, name):
+    """Serve a rendered mp4 with Range support for seeking."""
+    p = (jobs.JOBS_DIR / job_id / name).resolve()
+    root = (jobs.JOBS_DIR / job_id).resolve()
+    if not str(p).startswith(str(root)) or not p.exists() or p.suffix != ".mp4":
+        return "not found", 404
+    return send_file(p, mimetype="video/mp4", conditional=True)
+
+
+@app.get("/jobs/<job_id>/review")
+def review(job_id):
+    st = jobs.read_status(job_id) or {}
+    st["id"] = job_id
+    d = jobs.JOBS_DIR / job_id
+    verdicts = _read_verdicts(d)
+    clips = sorted(d.glob("short_*.mp4"))
+    rows = []
+    for c in clips:
+        meta_p = c.with_suffix(".json")
+        meta = {}
+        if meta_p.exists():
+            meta = json.loads(meta_p.read_text(encoding="utf-8"))
+        v = verdicts.get(c.name, {})
+        cls = ("reject" if v.get("verdict") == "reject"
+               else "keep" if v.get("verdict") == "keep" else "review")
+        rows.append({"file": c.name, "name": c.stem,
+                     "cls": cls, "verdict": v.get("verdict", ""),
+                     "comment": v.get("comment", ""),
+                     "saved": "",
+                     "meta": f"{meta.get('duration','?')}s · score {meta.get('score')} · "
+                             f"{(meta.get('text') or '')[:60]}"})
+    # green (unreviewed) on top, then keep, then reject
+    order = {"review": 0, "keep": 1, "reject": 2}
+    rows.sort(key=lambda r: order[r["cls"]])
+    return render_template_string(REVIEW, j=st, rows=rows)
+
+
+@app.post("/jobs/<job_id>/verdict")
+def verdict(job_id):
+    body = request.get_json(force=True)
+    d = jobs.JOBS_DIR / job_id
+    d.mkdir(parents=True, exist_ok=True)
+    rec = {"ts_utc": __import__("datetime").datetime.now(
+               __import__("datetime").timezone.utc).isoformat(),
+           "clip": body["clip"], "verdict": body.get("verdict"),
+           "comment": body.get("comment")}
+    with _edit_lock:
+        with open(_review_log(d), "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return jsonify(ok=True)
+
+
+@app.get("/jobs/<job_id>/review.jsonl")
+def review_readback(job_id):
+    """Agent readback — the frozen comments contract."""
+    p = _review_log(jobs.JOBS_DIR / job_id)
+    if not p.exists():
+        return "", 200, {"Content-Type": "text/plain"}
+    return p.read_text(encoding="utf-8"), 200, {"Content-Type": "application/jsonl"}
 
 
 @app.post("/jobs/<job_id>/render")
