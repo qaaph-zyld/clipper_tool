@@ -56,6 +56,7 @@
         "model": {"type": "string"},
         "hotwords_topic": {"type": ["string", "null"]},
         "align_method": {"enum": ["wav2vec2-sr", "stable-ts", "fw-word-ts", "segment", null]},
+        "align_detail": {"type": ["string", "null"]},
         "source_video": {"type": ["string", "null"]},
         "created": {"type": ["string", "null"]},
         "schema_version": {"type": "string"}

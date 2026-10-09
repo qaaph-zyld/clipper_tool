@@ -107,12 +107,16 @@ def align(t: Transcript, audio_path: str, device: str = "cpu") -> Transcript:
     weak = [s for s in t.segments if s.align_quality is not None and s.align_quality < 1 - UNALIGNED_RATIO_ABORT]
     if weak and t.meta.align_method == "wav2vec2-sr":
         try:
-            sub = Transcript(lang=t.lang, meta=t.meta, segments=weak)
+            import copy as _copy
+            sub = Transcript(lang=t.lang, meta=_copy.deepcopy(t.meta),
+                             segments=weak)
             align_stable_ts(sub, audio_path)
             for dst, src in zip(weak, sub.segments):
                 for w_dst, w_src in zip(dst.words, src.words):
                     w_dst.start, w_dst.end = w_src.start, w_src.end
                 dst.align_quality = src.align_quality
+            t.meta.align_detail = (f"stable-ts fallback on "
+                                   f"{len(weak)}/{len(t.segments)} segs")
         except Exception as e:
             logger.warning("stable-ts fallback failed: %s", e)
     if t.meta.align_method is None:

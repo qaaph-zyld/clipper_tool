@@ -80,7 +80,8 @@ class Segment(BaseModel):
 class TranscriptMeta(BaseModel):
     model: str                           # ASR engine id, e.g. "sr-v3-ct2"
     hotwords_topic: Optional[str] = None
-    align_method: Optional[str] = None   # wav2vec2-sr | stable-ts | fw-word-ts | segment
+    align_method: Optional[str] = None   # primary: wav2vec2-sr | stable-ts | fw-word-ts | segment
+    align_detail: Optional[str] = None   # e.g. "stable-ts fallback on 2/10 segs"
     source_video: Optional[str] = None
     created: Optional[str] = None        # ISO8601
     schema_version: str = SCHEMA_VERSION
@@ -116,6 +117,7 @@ class Transcript(BaseModel):
             for w in s.words:
                 yield s, w
 
-    def flagged_words(self, prob_below: float = 0.6) -> List[Word]:
+    def flagged_words(self, prob_below: float = 0.65) -> List[Word]:
+        """Fix-queue membership: explicit flags OR low prob (pre-flags stage)."""
         return [w for _, w in self.iter_words()
-                if w.prob is not None and w.prob < prob_below]
+                if w.flags or (w.prob is not None and w.prob < prob_below)]
